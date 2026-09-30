@@ -1,0 +1,14 @@
+streamlit==1.64.0
+pandas==3.0.6
+openpyxl==3.1.5
+duckdb==1.5.5
+sqlglot==30.18.0
+pyyaml==6.0.3
+plotly==7.1.0
+requests==2.34.2
+python-dotenv==1.2.3
+sqlalchemy==2.0.54
+psycopg2-binary==2.9.13
+pymysql==1.1.1
+cryptography>=3.4
+langgraph==1.2.12

@@ -1,0 +1,97 @@
+# ==========================================================
+# RESPONSE RULES
+# ==========================================================
+# Defines HOW SQL should rank/order results and HOW final
+# answers should be phrased/formatted for common question
+# patterns - especially ranking/sorting requests where the
+# user's wording is ambiguous (e.g. "top 5 months arrange in
+# desc order" - descending by what, the metric or the month?).
+#
+# This file is loaded alongside semantic_model.yaml and its
+# rules are injected into both the SQL-generation prompt and
+# the answer-summarization prompt.
+# ==========================================================
+
+ranking_rules:
+
+  - name: TOP_N_BY_METRIC
+    when: >
+      The user asks for "top N <dimension>" (e.g. "top 5 months",
+      "top 10 products", "top 3 customers"), optionally followed
+      by wording like "arrange/sort/order in descending/ascending
+      order".
+    rule: >
+      Rank by the primary metric implied by the question (revenue,
+      net sales, profit, quantity, etc.), NOT by the dimension
+      itself. "Descending order" / "highest first" means
+      ORDER BY <metric> DESC. "Ascending order" / "lowest first"
+      means ORDER BY <metric> ASC. Always apply LIMIT N to match
+      "top N".
+    example:
+      question: "Gimme top 5 months arrange in desc order"
+      sql: |
+        SELECT DATE_FORMAT(o.order_date, '%Y-%m-01') AS month,
+               ROUND(SUM(p.selling_price * oi.quantity * (1 - COALESCE(oi.discount, 0))), 2) AS net_sales
+        FROM orders o
+        JOIN order_items oi ON o.order_id = oi.order_id
+        JOIN products p ON oi.product_id = p.product_id
+        GROUP BY month
+        ORDER BY net_sales DESC
+        LIMIT 5;
+
+  - name: SORT_BY_DIMENSION_EXPLICIT
+    when: >
+      The user explicitly asks to sort/arrange/list by the
+      dimension itself rather than a metric (e.g. "list months
+      in order", "sort chronologically", "sort customers
+      alphabetically", "show months from latest to earliest").
+    rule: >
+      Order by the dimension's natural order instead of a metric:
+      chronological order for dates/months, alphabetical order for
+      text fields. Still respect any explicit ASC/DESC direction
+      given for the dimension.
+
+  - name: TIE_BREAKING
+    when: A ranking/ordering query produces tied metric values.
+    rule: >
+      Break ties using a secondary ORDER BY on the dimension itself
+      (chronological for dates, alphabetical for names) in
+      ascending order, so results are stable and repeatable.
+
+  - name: AMBIGUOUS_SORT_TARGET
+    when: >
+      It is unclear whether "arrange/sort/order" refers to the
+      metric or the dimension.
+    rule: >
+      Default to ordering by the primary metric value in the
+      requested direction (this matches how "top N" ranking
+      questions are normally intended). Make the ranking basis
+      explicit in the natural-language answer (e.g. "ranked by
+      net sales").
+
+response_formatting_rules:
+
+  - "Currency values: format with a \"$\" prefix and thousands separators, 2 decimal places (e.g. \"$307,708.19\"). Apply this to EVERY currency value in the answer without exception - never mix formatted and unformatted numbers in the same list."
+  - "Percentage values: format with a \"%\" suffix and 2 decimal places (e.g. \"27.39%\"). Apply this to every percentage value without exception."
+  - "Month/date values: format as \"Mon YYYY\" (e.g. \"Feb 2011\") in prose answers - never show raw timestamps like \"2011-02-01 00:00:00+00:00\"."
+  - "Counts: format as plain integers with thousands separators where useful (e.g. \"1,024 customers\")."
+  - >
+      Ranked lists (2+ items): NEVER write them as one running
+      paragraph. State the ranking basis once as a short lead-in
+      line (e.g. "Top 5 months by net sales:"), then output each
+      item as its own markdown bullet, one per line, in this exact
+      form: "- <label> \u2014 <formatted value>". Every bullet must use
+      the same value format (all currency, or all percent, etc.).
+      Example (verbatim structure to follow):
+      Top 5 months by net sales:
+      - Feb 2011 \u2014 $307,708.19
+      - Jan 2011 \u2014 $263,199.00
+      - Oct 2011 \u2014 $137,132.53
+      - Aug 2011 \u2014 $92,342.93
+      - Jul 2011 \u2014 $61,890.92
+
+tone_rules:
+
+  - "Be direct and concise (1-3 sentences) for single-value answers. For ranked-list answers, use the markdown bullet format described above instead of prose sentences."
+  - "Do not mention SQL, table names, or column names in the answer."
+  - "Do not add commentary or caveats unless the question is genuinely ambiguous or the data is incomplete."

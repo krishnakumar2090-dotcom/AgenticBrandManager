@@ -1,0 +1,796 @@
+name: SALES_ANALYST
+tables:
+  - name: CUSTOMERS
+    description: Customer master information
+    base_table:
+      database: SALES_ANALYST
+      schema: PUBLIC
+      table: CUSTOMERS
+
+    dimensions:
+      - name: CUSTOMER_ID
+        expr: CUSTOMER_ID
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: CUSTOMER_NAME
+        expr: CUSTOMER_NAME
+        data_type: VARCHAR
+        access_modifier: public_access
+        synonyms:
+          - CUSTOMER
+          - CLIENT
+          - BUYER
+
+      - name: SEGMENT
+        expr: SEGMENT
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: COUNTRY
+        expr: COUNTRY
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: STATE
+        expr: STATE
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: MARKET
+        expr: MARKET
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: REGION
+        expr: REGION
+        data_type: VARCHAR
+        access_modifier: public_access
+
+    primary_key:
+      columns:
+        - CUSTOMER_ID
+
+  - name: PRODUCTS
+    description: Product master data
+    base_table:
+      database: SALES_ANALYST
+      schema: PUBLIC
+      table: PRODUCTS
+
+    dimensions:
+      - name: PRODUCT_ID
+        expr: PRODUCT_ID
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: PRODUCT_NAME
+        expr: PRODUCT_NAME
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: CATEGORY
+        expr: CATEGORY
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: SUB_CATEGORY
+        expr: SUB_CATEGORY
+        data_type: VARCHAR
+        access_modifier: public_access
+
+    facts:
+      - name: PRODUCT_COST
+        expr: PRODUCT_COST
+        data_type: NUMBER(15,2)
+        access_modifier: public_access
+
+      - name: SELLING_PRICE
+        expr: SELLING_PRICE
+        data_type: NUMBER(15,2)
+        access_modifier: public_access
+
+    primary_key:
+      columns:
+        - PRODUCT_ID
+
+  - name: ORDERS
+    description: Order header information
+
+    base_table:
+      database: SALES_ANALYST
+      schema: PUBLIC
+      table: ORDERS
+
+    dimensions:
+      - name: ORDER_ID
+        expr: ORDER_ID
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: CUSTOMER_ID
+        expr: CUSTOMER_ID
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: SHIP_MODE
+        expr: SHIP_MODE
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: ORDER_PRIORITY
+        expr: ORDER_PRIORITY
+        data_type: VARCHAR
+        access_modifier: public_access
+
+    time_dimensions:
+
+      - name: ORDER_DATE
+        expr: ORDER_DATE
+        data_type: DATE
+        access_modifier: public_access
+
+      - name: SHIP_DATE
+        expr: SHIP_DATE
+        data_type: DATE
+        access_modifier: public_access
+
+    facts:
+      - name: YEAR
+        expr: YEAR
+        data_type: NUMBER(4,0)
+        access_modifier: public_access
+
+    primary_key:
+      columns:
+        - ORDER_ID
+
+  - name: ORDER_ITEMS
+    description: Transaction fact table containing sales activity
+
+    base_table:
+      database: SALES_ANALYST
+      schema: PUBLIC
+      table: ORDER_ITEMS
+
+    dimensions:
+
+      - name: ORDER_ITEM_ID
+        expr: ORDER_ITEM_ID
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: ORDER_ID
+        expr: ORDER_ID
+        data_type: VARCHAR
+        access_modifier: public_access
+
+      - name: PRODUCT_ID
+        expr: PRODUCT_ID
+        data_type: VARCHAR
+        access_modifier: public_access
+
+    facts:
+
+      - name: QUANTITY
+        expr: QUANTITY
+        data_type: NUMBER(10,0)
+        access_modifier: public_access
+
+      - name: DISCOUNT
+        expr: DISCOUNT
+        data_type: NUMBER(10,4)
+        access_modifier: public_access
+
+      - name: SHIPPING_COST
+        expr: SHIPPING_COST
+        data_type: NUMBER(15,2)
+        access_modifier: public_access
+
+      - name: PROFIT
+        expr: PROFIT
+        data_type: NUMBER(15,2)
+        access_modifier: public_access
+
+    metrics:
+      - name: TOTAL_PROFIT
+        description: Total profit
+        synonyms:
+          - PROFIT
+          - NET_PROFIT
+          - EARNINGS
+
+        expr: SUM(PROFIT)
+        access_modifier: public_access
+
+      - name: UNITS_SOLD
+        description: Number of units sold
+        expr: SUM(QUANTITY)
+        access_modifier: public_access
+
+      - name: TOTAL_NET_SALES
+        description: Revenue after discount
+        synonyms:
+          - SALES
+          - REVENUE
+          - TURNOVER
+        expr: >
+          SUM(
+            (
+              SELLING_PRICE
+              * QUANTITY
+            )
+            * (
+              1 - COALESCE(DISCOUNT,0)
+            )
+          )
+
+        access_modifier: public_access
+
+    primary_key:
+      columns:
+        - ORDER_ITEM_ID
+
+metrics:
+
+  - name: PROFIT_MARGIN_PERCENT
+    description: Profit margin percentage
+    expr: >
+      SUM(PROFIT)
+      /
+      NULLIF(
+        SUM(
+          (
+            SELLING_PRICE
+            * QUANTITY
+          )
+          * (
+            1 - COALESCE(DISCOUNT,0)
+          )
+        ),
+        0
+      ) * 100
+
+    access_modifier: public_access
+  - name: AVERAGE_ORDER_VALUE
+    description: Average order value
+    synonyms:
+      - AOV
+    expr: >
+      SUM(
+        (
+          SELLING_PRICE
+          * QUANTITY
+        )
+        *
+        (
+          1 - COALESCE(DISCOUNT,0)
+        )
+      )
+      /
+      NULLIF(
+        COUNT(DISTINCT ORDER_ID),
+        0
+      )
+
+    access_modifier: public_access
+
+  - name: ACTIVE_CUSTOMERS
+    description: Count of distinct customers who have placed at least one order
+    synonyms:
+      - ACTIVE_CUSTOMER_COUNT
+    expr: >
+      COUNT(DISTINCT CUSTOMER_ID)
+
+    access_modifier: public_access
+
+  - name: WEIGHTED_DISCOUNT_RATE
+    description: Revenue-weighted average discount rate
+    synonyms:
+      - AVERAGE_DISCOUNT
+      - DISCOUNT_RATE
+    expr: >
+      SUM(
+        SELLING_PRICE
+        * QUANTITY
+        * DISCOUNT
+      )
+      /
+      NULLIF(
+        SUM(
+          SELLING_PRICE
+          * QUANTITY
+        ),
+        0
+      ) * 100
+
+    access_modifier: public_access
+
+relationships:
+  - name: CUSTOMERS_TO_ORDERS
+    left_table: CUSTOMERS
+    right_table: ORDERS
+
+    relationship_columns:
+
+      - left_column: CUSTOMER_ID
+        right_column: CUSTOMER_ID
+
+  - name: ORDERS_TO_ORDER_ITEMS
+
+    left_table: ORDERS
+    right_table: ORDER_ITEMS
+
+    relationship_columns:
+
+      - left_column: ORDER_ID
+        right_column: ORDER_ID
+
+  - name: PRODUCTS_TO_ORDER_ITEMS
+
+    left_table: PRODUCTS
+    right_table: ORDER_ITEMS
+
+    relationship_columns:
+
+      - left_column: PRODUCT_ID
+        right_column: PRODUCT_ID
+
+verified_queries:
+
+  - name: TOP_CUSTOMERS_BY_PROFIT
+
+    question: Show the top 5 customers by profit
+
+    sql: |
+      SELECT
+          c.customer_name,
+          ROUND(
+              SUM(oi.profit),
+              2
+          ) AS total_profit
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      GROUP BY c.customer_name
+      ORDER BY total_profit DESC
+      LIMIT 5;
+
+  - name: REVENUE_BY_REGION
+
+    question: Which region generated the highest revenue?
+
+    sql: |
+      SELECT
+          c.region,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              ),
+              2
+          ) AS revenue
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY c.region
+      ORDER BY revenue DESC
+      LIMIT 1;
+
+  - name: MONTHLY_SALES_TREND
+
+    question: Show monthly sales trend.
+
+    sql: |
+      SELECT
+          DATE_FORMAT(o.order_date, '%Y-%m-01') AS month,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              ),
+              2
+          ) AS net_sales
+      FROM orders o
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY month
+      ORDER BY month;
+
+  - name: NET_SALES_BY_REGION_COUNTRY
+
+    question: Which region/country contributed most to net sales?
+
+    sql: |
+      SELECT
+          c.region,
+          c.country,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              ),
+              2
+          ) AS net_sales
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY c.region, c.country
+      ORDER BY net_sales DESC
+      LIMIT 10;
+
+  - name: SALES_GROWTH_YOY_QOQ
+
+    question: Are we growing? Compare YoY, QoQ and YTD/QTD.
+
+    sql: |
+      SELECT
+          YEAR(o.order_date) AS order_year,
+          QUARTER(o.order_date) AS order_quarter,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              ),
+              2
+          ) AS net_sales
+      FROM orders o
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY order_year, order_quarter
+      ORDER BY order_year, order_quarter;
+
+  - name: TOP_PRODUCTS_BY_PROFIT
+
+    question: Which products generated the highest profit?
+
+    sql: |
+      SELECT
+          p.product_name,
+          ROUND(SUM(oi.profit), 2) AS total_profit
+      FROM products p
+      JOIN order_items oi
+          ON p.product_id = oi.product_id
+      GROUP BY p.product_name
+      ORDER BY total_profit DESC
+      LIMIT 10;
+
+  - name: MARKETS_WITH_LOSSES
+
+    question: Which markets are making losses?
+
+    sql: |
+      SELECT
+          c.market,
+          ROUND(SUM(oi.profit), 2) AS total_profit
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      GROUP BY c.market
+      HAVING SUM(oi.profit) < 0
+      ORDER BY total_profit ASC;
+
+  - name: HIGH_SALES_LOW_MARGIN_CATEGORIES
+
+    question: Which categories have high sales but low margins?
+
+    sql: |
+      SELECT
+          p.category,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              ),
+              2
+          ) AS net_sales,
+          ROUND(
+              SUM(oi.profit)
+              / NULLIF(
+                  SUM(
+                      p.selling_price
+                      * oi.quantity
+                      * (1 - COALESCE(oi.discount,0))
+                  ),
+                  0
+              ) * 100,
+              2
+          ) AS profit_margin_percent
+      FROM products p
+      JOIN order_items oi
+          ON p.product_id = oi.product_id
+      GROUP BY p.category
+      ORDER BY net_sales DESC, profit_margin_percent ASC;
+
+  - name: PRODUCTS_WITH_NEGATIVE_MARGIN
+
+    question: Show products with margin below zero.
+
+    sql: |
+      SELECT
+          p.product_name,
+          ROUND(SUM(oi.profit), 2) AS total_profit,
+          ROUND(
+              SUM(oi.profit)
+              / NULLIF(
+                  SUM(
+                      p.selling_price
+                      * oi.quantity
+                      * (1 - COALESCE(oi.discount,0))
+                  ),
+                  0
+              ) * 100,
+              2
+          ) AS profit_margin_percent
+      FROM products p
+      JOIN order_items oi
+          ON p.product_id = oi.product_id
+      GROUP BY p.product_name
+      HAVING SUM(oi.profit) < 0
+      ORDER BY profit_margin_percent ASC;
+
+  - name: AOV_BY_MARKET
+
+    question: Which markets have the highest average order value?
+
+    sql: |
+      SELECT
+          c.market,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              )
+              / NULLIF(COUNT(DISTINCT o.order_id), 0),
+              2
+          ) AS average_order_value
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY c.market
+      ORDER BY average_order_value DESC;
+
+  - name: AOV_BY_SEGMENT
+
+    question: Compare average order value by customer segment.
+
+    sql: |
+      SELECT
+          c.segment,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              )
+              / NULLIF(COUNT(DISTINCT o.order_id), 0),
+              2
+          ) AS average_order_value
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY c.segment
+      ORDER BY average_order_value DESC;
+
+  - name: ACTIVE_CUSTOMERS_BY_SEGMENT
+
+    question: Which segments have the most active customers?
+
+    sql: |
+      SELECT
+          c.segment,
+          COUNT(DISTINCT c.customer_id) AS active_customers
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      GROUP BY c.segment
+      ORDER BY active_customers DESC;
+
+  - name: ACTIVE_CUSTOMERS_BY_MARKET
+
+    question: How many active customers are in each market?
+
+    sql: |
+      SELECT
+          c.market,
+          COUNT(DISTINCT c.customer_id) AS active_customers
+      FROM customers c
+      JOIN orders o
+          ON c.customer_id = o.customer_id
+      GROUP BY c.market
+      ORDER BY active_customers DESC;
+
+  - name: NEW_VS_REPEAT_CUSTOMER_SALES
+
+    question: Compare new and repeat customer sales.
+
+    sql: |
+      WITH customer_order_counts AS (
+          SELECT
+              c.customer_id,
+              COUNT(DISTINCT o.order_id) AS order_count
+          FROM customers c
+          JOIN orders o
+              ON c.customer_id = o.customer_id
+          GROUP BY c.customer_id
+      )
+      SELECT
+          CASE
+              WHEN coc.order_count > 1 THEN 'Repeat'
+              ELSE 'New'
+          END AS customer_type,
+          ROUND(
+              SUM(
+                  p.selling_price
+                  * oi.quantity
+                  * (1 - COALESCE(oi.discount,0))
+              ),
+              2
+          ) AS net_sales
+      FROM customer_order_counts coc
+      JOIN orders o
+          ON coc.customer_id = o.customer_id
+      JOIN order_items oi
+          ON o.order_id = oi.order_id
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY customer_type;
+
+  - name: REPEAT_CUSTOMER_RATE_BY_MARKET
+
+    question: Which markets have the highest repeat customer rate?
+
+    sql: |
+      WITH customer_order_counts AS (
+          SELECT
+              c.customer_id,
+              c.market,
+              COUNT(DISTINCT o.order_id) AS order_count
+          FROM customers c
+          JOIN orders o
+              ON c.customer_id = o.customer_id
+          GROUP BY c.customer_id, c.market
+      )
+      SELECT
+          market,
+          ROUND(
+              100.0 * COUNT(*) FILTER (WHERE order_count > 1)
+              / NULLIF(COUNT(*), 0),
+              2
+          ) AS repeat_customer_rate_percent
+      FROM customer_order_counts
+      GROUP BY market
+      ORDER BY repeat_customer_rate_percent DESC;
+
+  - name: DISCOUNT_VS_PROFITABILITY
+
+    question: How does discount affect profitability?
+
+    sql: |
+      SELECT
+          ROUND(oi.discount, 2) AS discount_level,
+          ROUND(SUM(oi.profit), 2) AS total_profit,
+          ROUND(
+              SUM(oi.profit)
+              / NULLIF(
+                  SUM(
+                      p.selling_price
+                      * oi.quantity
+                      * (1 - COALESCE(oi.discount,0))
+                  ),
+                  0
+              ) * 100,
+              2
+          ) AS profit_margin_percent
+      FROM order_items oi
+      JOIN products p
+          ON oi.product_id = p.product_id
+      GROUP BY discount_level
+      ORDER BY discount_level;
+
+  - name: HIGH_DISCOUNT_PROFITABLE_PRODUCTS
+
+    question: Which products receive high discounts but remain profitable?
+
+    sql: |
+      SELECT
+          p.product_name,
+          ROUND(AVG(oi.discount), 4) AS average_discount,
+          ROUND(SUM(oi.profit), 2) AS total_profit
+      FROM products p
+      JOIN order_items oi
+          ON p.product_id = oi.product_id
+      GROUP BY p.product_name
+      HAVING AVG(oi.discount) > 0.2 AND SUM(oi.profit) > 0
+      ORDER BY average_discount DESC;
+
+module_custom_instructions:
+
+  sql_generation: |
+    Use MySQL syntax.
+
+    Generate only SELECT statements.
+
+    Never generate INSERT, UPDATE,
+    DELETE, DROP, ALTER or TRUNCATE.
+
+    Use only documented tables,
+    dimensions, facts and metrics.
+
+    Revenue means TOTAL_NET_SALES.
+
+    Profit means TOTAL_PROFIT.
+
+    Use COUNT(DISTINCT ORDER_ID)
+    when counting orders.
+
+    Use ORDER_DATE for trend analysis.
+    Prefer DATE_FORMAT(ORDER_DATE, '%Y-%m-01')
+    for monthly grouping, and YEAR(ORDER_DATE) /
+    QUARTER(ORDER_DATE) for yearly/quarterly
+    grouping, over the ORDERS.YEAR column, since
+    YEAR may contain missing values.
+
+    Always respect documented
+    relationships.
+
+    An "active customer" is a
+    customer with at least one
+    order (COUNT(DISTINCT CUSTOMER_ID)
+    from ORDERS joined to CUSTOMERS).
+
+    A "repeat" or "returning"
+    customer is a customer with
+    more than one distinct ORDER_ID.
+    A "new" customer has exactly
+    one distinct ORDER_ID.
+
+    Weighted discount rate means
+    WEIGHTED_DISCOUNT_RATE: total
+    discount amount divided by
+    total gross sales, expressed
+    as a percentage.
+
+    Profit margin % means
+    PROFIT_MARGIN_PERCENT: total
+    profit divided by total net
+    sales, expressed as a
+    percentage.
+
+    For AOV, YoY, QoQ, YTD/QTD and
+    similar comparisons, use
+    DATE_FORMAT(ORDER_DATE, '%Y-%m-01')
+    for monthly grouping, or
+    YEAR(ORDER_DATE) / QUARTER(ORDER_DATE)
+    for yearly/quarterly grouping, as
+    needed.
